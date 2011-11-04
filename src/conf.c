@@ -254,7 +254,7 @@ struct {
                 BEGIN "(no" WS "upstream)" WS STR END, handle_upstream_no, NULL
         },
         {
-                BEGIN "(upstream)" WS "(" IP "|" ALNUM ")" ":" INT "(" WS STR
+                BEGIN "(upstream)" WS "(socks4|socks5|http)?" WS "(" IP "|" ALNUM ")" ":" INT "(" WS STR
                       ")?" END, handle_upstream, NULL
         },
 #endif
@@ -1048,20 +1048,31 @@ static HANDLE_FUNC (handle_upstream)
         char *ip;
         int port;
         char *domain;
+        char *stype;
+        proxy_type type;
 
-        ip = get_string_arg (line, &match[2]);
+        stype = get_string_arg (line, &match[2]);
+        if (!strncmp (stype, "socks5", 6))
+                type = SOCKS5_TYPE;
+        else if (!strncmp (stype, "socks4", 6))
+                type = SOCKS4_TYPE;
+        else
+                type = HTTP_TYPE;
+
+        ip = get_string_arg (line, &match[3]);
         if (!ip)
                 return -1;
-        port = (int) get_long_arg (line, &match[7]);
+        port = (int) get_long_arg (line, &match[8]);
 
-        if (match[10].rm_so != -1) {
-                domain = get_string_arg (line, &match[10]);
+        if (match[11].rm_so != -1) {
+                domain = get_string_arg (line, &match[11]);
                 if (domain) {
-                        upstream_add (ip, port, domain, &conf->upstream_list);
+                        upstream_add (ip, port, domain, &conf->upstream_list,
+                                      type);
                         safefree (domain);
                 }
         } else {
-                upstream_add (ip, port, NULL, &conf->upstream_list);
+                upstream_add (ip, port, NULL, &conf->upstream_list, type);
         }
 
         safefree (ip);
@@ -1077,7 +1088,7 @@ static HANDLE_FUNC (handle_upstream_no)
         if (!domain)
                 return -1;
 
-        upstream_add (NULL, 0, domain, &conf->upstream_list);
+        upstream_add (NULL, 0, domain, &conf->upstream_list, HTTP_TYPE);
         safefree (domain);
 
         return 0;
